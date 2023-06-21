@@ -1,8 +1,7 @@
 import os
 from flask import Flask, jsonify, request
 from dotenv import load_dotenv
-from microservice_helper import load_model, get_simple_definitions, get_list_of_table_names, get_tables_related_to_the_question
-
+from microservice_helper import * 
 
 app = Flask(__name__)
 
@@ -22,7 +21,6 @@ def not_found(error):
             'error': 'page not found',
             'message': 'Oops, something went wrong :(, this page does not exist'}, 404
 
-
 # get question route
 @app.route('/question', methods=['POST'])
 def get_question():
@@ -37,23 +35,16 @@ def get_question():
                 'error': 'question not found',
                 'message': 'Oops, something went wrong :(, the question was not found'}, 400
 
-    table, error = get_tables_related_to_the_question(question, temperature)
-    
+    # get the tables related to the question
+    data_related, error = get_data_related_to_the_question(question, temperature)
     # check if there is an error
     if error is not None:
         return {'success': False,
                 'error': error,
                 'message': 'Oops, something went wrong :('}, 500
 
-    # check if the table is empty
-    if len(table) == 0:
-        return {'success': False,
-                'error': 'Empty list',
-                'message': 'No tables related to the question were found'}, 200
-    
     definitions_of_tables = ""
-    for table_name in table:
-        print("ok")
+    for table_name in data_related.tables:
         definition, error = get_simple_definitions(table_name)
         if error is not None:
             return {'success': False,
@@ -61,11 +52,15 @@ def get_question():
                     'message': 'Oops, something went wrong :('}, 500
         definitions_of_tables += definition + "\n"
 
+    
+
+    # return a json
     return {'success': True,
             'error': None,
             'message': 'success',
             'question': question,
-            'definitions': definitions_of_tables}, 200
+            'tables_definitions': definitions_of_tables,
+            'routes': data_related.routes}, 200
 
 # get definition of table route by name
 @app.route('/definition/<table_name>', methods=['GET'])
@@ -85,9 +80,8 @@ def get_definition_by_name(table_name):
             'message': 'Table name found successfully',
             'table': { 'name': table_name,'definition': definition }}, 200
 
-
-@app.route('/debug', methods=['GET'])
-def debug():
+@app.route('/definition/list', methods=['GET'])
+def table_list():
     list_of_table_names, error = get_list_of_table_names()
     if error is not None:
         return {'success': False,
@@ -98,16 +92,39 @@ def debug():
             'error': None,
             'message': 'List of table names found successfully',
             'data': list_of_table_names}, 200
-    
+
+@app.route('/routes/list', methods=['GET'])
+def get_routers_list():
+    try:
+        # Get list of router
+        response, error = get_route_definitions_from_api()
+        if error is not None:
+            return { 'success': False,
+                    'error': error,
+                    'message': 'Oops, something went wrong :('}, 500
+        
+        # success
+        return { 'success': True,
+                'error': None,
+                'message': 'List of routers found successfully',
+                'routers': response}, 200
+
+    except http.exceptions.RequestException as e:
+        return { 'success': False,
+                'message': 'Error trying to get the list of routers',
+                'error': str(e),
+                'message': 'Oops, something went wrong :('}, 500
+        
+
 def check_env_variables():
     return os.getenv('HOST') is None or \
         os.getenv('PORT') is None or \
         os.getenv('DEBUG') is None or \
-        os.getenv('PATH_DB_DEFINITION_DIR') is None
+        os.getenv('PATH_DB_DEFINITION_DIR') is None or\
+        os.getenv('URL_API') is None 
     
 with app.app_context():
     load_model()
-
 
 
 # entry point for the application
