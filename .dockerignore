@@ -1,0 +1,13 @@
+# Python
+env
+__pycache__
+
+# Environment
+.env
+
+
+# development
+experimental
+
+# README
+README.md
