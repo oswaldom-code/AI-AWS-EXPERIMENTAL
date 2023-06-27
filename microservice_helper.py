@@ -51,17 +51,16 @@ def get_tables_related_to_the_question(question, temperature=None):
         return [], error
     
     # Get the similarity between the question and the table name
-    tables_related = OrderedDict() # List of tables related to the question
+    related_tables = OrderedDict() # List of tables related to the question
     for table_name in tables_names:
         # get the similarity between the question and the table name
         # proximity_rank is a float number between 0 and 1
         proximity_value = current_app.word2vec_model.n_similarity(tokenized_question, table_name)
         if proximity_value >= temperature:
-            tables_related[table_name] = proximity_value
-            tables_related.append(table_name)
+            related_tables[table_name] = proximity_value
 
     # Sort the tables related to the question by proximity value
-    tables_related_sorted = OrderedDict(sorted(tables_related.items(), key=lambda x: x[1], reverse=True))
+    tables_related_sorted = OrderedDict(sorted(related_tables.items(), key=lambda x: x[1], reverse=True))
     
     # if there are tables related to the question, return them
     if len(tables_related_sorted) > 0:
@@ -73,13 +72,17 @@ def get_tables_related_to_the_question(question, temperature=None):
 
 # get_list_of_table_names: Read all files in the directory and return a list of table names
 def get_list_of_table_names():
-    table_names = []
-    for file in os.listdir(os.environ.get('PATH_DB_DEFINITION_DIR')):
-        if file.endswith(".txt"):
-            table_names.append(file.split('.')[0]) # Get the table name without extension
-            
-    return table_names, None # Return list of table names and None if there is no error
+    try: 
+        table_names = []
+        for file in os.listdir(os.environ.get('PATH_DB_DEFINITION_DIR')):
+            if file.endswith(".txt"):
+                table_names.append(file.split('.')[0]) # Get the table name without extension
 
+        return table_names, None # Return list of table names and None if there is no error
+    except Exception as error:
+        print("Error reading files:", error)
+        return None, error # Return None and error if there is an error
+    
 
 # get_simple_definitions: Read a file with db_definitions and return a definition of the table by name
 def get_simple_definitions(table_name):
@@ -115,11 +118,11 @@ def get_route_definitions_from_api():
         # success
         return ROUTE_DEFINITIONS_CACHE, None
 
-    except http.exceptions.RequestException as e:
-        return None, e
+    except http.exceptions.RequestException as error:
+        return None, error
 
 # get_routes_related_to_the_question : Get the routes related to the question using difflib
-def get_routes_related_to_the_question(question, temperature=None):
+def get_routes_related_to_the_question(question, temperature):
     # get all the routes
     routes_list, error = get_route_definitions_from_api()
     if error is not None:
